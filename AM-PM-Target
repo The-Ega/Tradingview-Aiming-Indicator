@@ -1,0 +1,317 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © The_EGA
+
+//@version=6
+indicator("AM / PM Session Marks", overlay = true, max_lines_count = 200, max_labels_count = 200)
+
+string tz      = input.string("America/New_York", "Timezone")
+string sessMode = input.string("Both", "Show session", options = ["AM only", "PM only", "Both"], group = "Session")
+int    histDays = input.int(5, "Show old days", minval = 0, maxval = 5, group = "History")
+color  histColor = input.color(color.black, "Old day color", group = "History")
+
+bool useAM = sessMode != "PM only"
+bool usePM = sessMode != "AM only"
+
+bool   show0930    = input.bool(true, "Show", group = "09:30", inline = "09s")
+string style0930In = input.string("Dashed", "Style", options = ["Solid", "Dashed", "Dotted"], group = "09:30", inline = "09s")
+string text0930    = input.string("Equity Open", "Text", group = "09:30")
+color  lineCol0930 = input.color(color.red, "Line", group = "09:30")
+color  txtCol0930  = input.color(color.black, "Text color", group = "09:30")
+
+bool   show1030    = input.bool(true, "Show", group = "10:30", inline = "10s")
+string style1030In = input.string("Dashed", "Style", options = ["Solid", "Dashed", "Dotted"], group = "10:30", inline = "10s")
+string text1030    = input.string("1st Hour Trading", "Text", group = "10:30")
+color  lineCol1030 = input.color(color.red, "Line", group = "10:30")
+color  txtCol1030  = input.color(color.black, "Text color", group = "10:30")
+
+bool   show1130    = input.bool(true, "Show", group = "11:30", inline = "11s")
+string style1130In = input.string("Dashed", "Style", options = ["Solid", "Dashed", "Dotted"], group = "11:30", inline = "11s")
+string text1130    = input.string("Lunch Start", "Text", group = "11:30")
+color  lineCol1130 = input.color(color.red, "Line", group = "11:30")
+color  txtCol1130  = input.color(color.black, "Text color", group = "11:30")
+
+bool   show1330    = input.bool(true, "Show", group = "13:30", inline = "13s")
+string style1330In = input.string("Dashed", "Style", options = ["Solid", "Dashed", "Dotted"], group = "13:30", inline = "13s")
+string text1330    = input.string("PM Start", "Text", group = "13:30")
+color  lineCol1330 = input.color(color.red, "Line", group = "13:30")
+color  txtCol1330  = input.color(color.black, "Text color", group = "13:30")
+
+bool   show1500    = input.bool(true, "Show", group = "15:00", inline = "15s")
+string style1500In = input.string("Dashed", "Style", options = ["Solid", "Dashed", "Dotted"], group = "15:00", inline = "15s")
+string text1500    = input.string("PM End", "Text", group = "15:00")
+color  lineCol1500 = input.color(color.red, "Line", group = "15:00")
+color  txtCol1500  = input.color(color.black, "Text color", group = "15:00")
+
+bool   showAMH    = input.bool(true, "Show ray", group = "09:30-11:30 High")
+color  amhColor   = input.color(color.blue, "Ray color", group = "09:30-11:30 High")
+string amhText    = input.string("BUYSTOP", "Ray text", group = "09:30-11:30 High")
+color  amhTxtCol  = input.color(color.black, "Text color", group = "09:30-11:30 High")
+color  amhFillCol = input.color(color.rgb(255, 255, 255, 100), "Text fill", group = "09:30-11:30 High")
+
+bool   showAML    = input.bool(true, "Show ray", group = "09:30-11:30 Low")
+color  amlColor   = input.color(color.red, "Ray color", group = "09:30-11:30 Low")
+string amlText    = input.string("SELLSTOP", "Ray text", group = "09:30-11:30 Low")
+color  amlTxtCol  = input.color(color.black, "Text color", group = "09:30-11:30 Low")
+color  amlFillCol = input.color(color.rgb(255, 255, 255, 100), "Text fill", group = "09:30-11:30 Low")
+
+bool   showPMH    = input.bool(true, "Show ray", group = "13:30-15:00 High")
+color  pmhColor   = input.color(color.blue, "Ray color", group = "13:30-15:00 High")
+string pmhText    = input.string("BUYSTOP", "Ray text", group = "13:30-15:00 High")
+color  pmhTxtCol  = input.color(color.black, "Text color", group = "13:30-15:00 High")
+color  pmhFillCol = input.color(color.rgb(255, 255, 255, 100), "Text fill", group = "13:30-15:00 High")
+
+bool   showPML    = input.bool(true, "Show ray", group = "13:30-15:00 Low")
+color  pmlColor   = input.color(color.red, "Ray color", group = "13:30-15:00 Low")
+string pmlText    = input.string("SELLSTOP", "Ray text", group = "13:30-15:00 Low")
+color  pmlTxtCol  = input.color(color.black, "Text color", group = "13:30-15:00 Low")
+color  pmlFillCol = input.color(color.rgb(255, 255, 255, 100), "Text fill", group = "13:30-15:00 Low")
+
+lineStyleFrom(string s) =>
+    s == "Dashed" ? line.style_dashed : s == "Dotted" ? line.style_dotted : line.style_solid
+
+monthAbbr(int m) =>
+    switch m
+        1  => "JAN"
+        2  => "FEB"
+        3  => "MAR"
+        4  => "APR"
+        5  => "MAY"
+        6  => "JUN"
+        7  => "JUL"
+        8  => "AUG"
+        9  => "SEP"
+        10 => "OCT"
+        11 => "NOV"
+        => "DEC"
+
+dayOrdinal(int n) =>
+    int mod100 = n % 100
+    int mod10  = n % 10
+    string suf = mod100 >= 11 and mod100 <= 13 ? "th" : mod10 == 1 ? "st" : mod10 == 2 ? "nd" : mod10 == 3 ? "rd" : "th"
+    str.tostring(n) + suf
+
+dateText(int dd, int mm) =>
+    dayOrdinal(dd) + " " + monthAbbr(mm)
+
+string style0930 = lineStyleFrom(style0930In)
+string style1030 = lineStyleFrom(style1030In)
+string style1130 = lineStyleFrom(style1130In)
+string style1330 = lineStyleFrom(style1330In)
+string style1500 = lineStyleFrom(style1500In)
+
+var array<line>  drawnLines = array.new<line>()
+var array<label> drawnLabs  = array.new<label>()
+
+var array<int>   amHistY     = array.new<int>()
+var array<int>   amHistMo    = array.new<int>()
+var array<int>   amHistD     = array.new<int>()
+var array<int>   amHist0930  = array.new<int>()
+var array<int>   amHist1030  = array.new<int>()
+var array<int>   amHist1130  = array.new<int>()
+var array<float> amHistHigh  = array.new<float>()
+var array<float> amHistLow   = array.new<float>()
+var array<int>   amHistHighT = array.new<int>()
+var array<int>   amHistLowT  = array.new<int>()
+
+var array<int>   pmHistY     = array.new<int>()
+var array<int>   pmHistMo    = array.new<int>()
+var array<int>   pmHistD     = array.new<int>()
+var array<int>   pmHist1330  = array.new<int>()
+var array<int>   pmHist1500  = array.new<int>()
+var array<float> pmHistHigh  = array.new<float>()
+var array<float> pmHistLow   = array.new<float>()
+var array<int>   pmHistHighT = array.new<int>()
+var array<int>   pmHistLowT  = array.new<int>()
+
+var float amHigh   = na
+var float amLow    = na
+var int   amHighT  = na
+var int   amLowT   = na
+var int   amSessY  = na
+var int   amSessMo = na
+var int   amSessD  = na
+var int   amSess0930 = na
+var int   amSess1030 = na
+var int   amSess1130 = na
+
+var float pmHigh   = na
+var float pmLow    = na
+var int   pmHighT  = na
+var int   pmLowT   = na
+var int   pmSessY  = na
+var int   pmSessMo = na
+var int   pmSessD  = na
+var int   pmSess1330 = na
+var int   pmSess1500 = na
+
+int y  = year(time, tz)
+int mo = month(time, tz)
+int d  = dayofmonth(time, tz)
+int time0930 = timestamp(tz, y, mo, d, 9, 30)
+int time1030 = timestamp(tz, y, mo, d, 10, 30)
+int time1130 = timestamp(tz, y, mo, d, 11, 30)
+int time1330 = timestamp(tz, y, mo, d, 13, 30)
+int time1500 = timestamp(tz, y, mo, d, 15, 0)
+
+bool is0930Bar = time <= time0930 and time_close > time0930
+bool is1330Bar = time <= time1330 and time_close > time1330
+bool inAM      = time < time1130 and time_close > time0930
+bool inPM      = time < time1500 and time_close > time1330
+
+trimTo5(array<int> a) =>
+    if array.size(a) > 5
+        array.shift(a)
+
+pushAMHist() =>
+    array.push(amHistY, amSessY)
+    array.push(amHistMo, amSessMo)
+    array.push(amHistD, amSessD)
+    array.push(amHist0930, amSess0930)
+    array.push(amHist1030, amSess1030)
+    array.push(amHist1130, amSess1130)
+    array.push(amHistHigh, amHigh)
+    array.push(amHistLow, amLow)
+    array.push(amHistHighT, amHighT)
+    array.push(amHistLowT, amLowT)
+    if array.size(amHistY) > 5
+        array.shift(amHistY)
+        array.shift(amHistMo)
+        array.shift(amHistD)
+        array.shift(amHist0930)
+        array.shift(amHist1030)
+        array.shift(amHist1130)
+        array.shift(amHistHigh)
+        array.shift(amHistLow)
+        array.shift(amHistHighT)
+        array.shift(amHistLowT)
+
+pushPMHist() =>
+    array.push(pmHistY, pmSessY)
+    array.push(pmHistMo, pmSessMo)
+    array.push(pmHistD, pmSessD)
+    array.push(pmHist1330, pmSess1330)
+    array.push(pmHist1500, pmSess1500)
+    array.push(pmHistHigh, pmHigh)
+    array.push(pmHistLow, pmLow)
+    array.push(pmHistHighT, pmHighT)
+    array.push(pmHistLowT, pmLowT)
+    if array.size(pmHistY) > 5
+        array.shift(pmHistY)
+        array.shift(pmHistMo)
+        array.shift(pmHistD)
+        array.shift(pmHist1330)
+        array.shift(pmHist1500)
+        array.shift(pmHistHigh)
+        array.shift(pmHistLow)
+        array.shift(pmHistHighT)
+        array.shift(pmHistLowT)
+
+if is0930Bar
+    if not na(amHigh) and not na(amSessY)
+        pushAMHist()
+    amHigh     := high
+    amLow      := low
+    amHighT    := time
+    amLowT     := time
+    amSessY    := y
+    amSessMo   := mo
+    amSessD    := d
+    amSess0930 := time0930
+    amSess1030 := time1030
+    amSess1130 := time1130
+
+if not is0930Bar and inAM
+    if na(amHigh) or high >= amHigh
+        amHigh  := high
+        amHighT := time
+    if na(amLow) or low <= amLow
+        amLow  := low
+        amLowT := time
+
+if is1330Bar
+    if not na(pmHigh) and not na(pmSessY)
+        pushPMHist()
+    pmHigh     := high
+    pmLow      := low
+    pmHighT    := time
+    pmLowT     := time
+    pmSessY    := y
+    pmSessMo   := mo
+    pmSessD    := d
+    pmSess1330 := time1330
+    pmSess1500 := time1500
+
+if not is1330Bar and inPM
+    if na(pmHigh) or high >= pmHigh
+        pmHigh  := high
+        pmHighT := time
+    if na(pmLow) or low <= pmLow
+        pmLow  := low
+        pmLowT := time
+
+addLine(line ln) =>
+    array.push(drawnLines, ln)
+
+addLab(label lb) =>
+    array.push(drawnLabs, lb)
+
+drawAM(int t0930, int t1030, int t1130, float hi, float lo, int hiT, int loT, int dd, int mm, color v0930, color v1030, color v1130, color t0930c, color t1030c, color t1130c, color hiCol, color loCol, color hiTxt, color loTxt, color hiFill, color loFill) =>
+    string dTxt = dateText(dd, mm)
+    if show0930
+        addLine(line.new(x1 = t0930, y1 = low, x2 = t0930, y2 = high, xloc = xloc.bar_time, extend = extend.both, color = v0930, width = 1, style = style0930))
+        addLab(label.new(x = t0930, y = na, text = text0930, xloc = xloc.bar_time, yloc = yloc.belowbar, color = color.new(color.white, 100), style = label.style_none, textcolor = t0930c, size = size.small))
+    if show1030
+        addLine(line.new(x1 = t1030, y1 = low, x2 = t1030, y2 = high, xloc = xloc.bar_time, extend = extend.both, color = v1030, width = 1, style = style1030))
+        addLab(label.new(x = t1030, y = na, text = text1030, xloc = xloc.bar_time, yloc = yloc.belowbar, color = color.new(color.white, 100), style = label.style_none, textcolor = t1030c, size = size.small))
+    if show1130
+        addLine(line.new(x1 = t1130, y1 = low, x2 = t1130, y2 = high, xloc = xloc.bar_time, extend = extend.both, color = v1130, width = 1, style = style1130))
+        addLab(label.new(x = t1130, y = na, text = text1130, xloc = xloc.bar_time, yloc = yloc.belowbar, color = color.new(color.white, 100), style = label.style_none, textcolor = t1130c, size = size.small))
+    if showAMH and not na(hi) and not na(hiT)
+        addLine(line.new(x1 = hiT, y1 = hi, x2 = last_bar_time, y2 = hi, xloc = xloc.bar_time, extend = extend.right, color = hiCol, width = 1))
+        addLab(label.new(x = last_bar_time, y = hi, text = dTxt + " " + amhText + " [AM-" + str.tostring(hi, format.mintick) + "]", xloc = xloc.bar_time, yloc = yloc.price, color = hiFill, style = label.style_label_left, textcolor = hiTxt, size = 10, textalign = text.align_right))
+    if showAML and not na(lo) and not na(loT)
+        addLine(line.new(x1 = loT, y1 = lo, x2 = last_bar_time, y2 = lo, xloc = xloc.bar_time, extend = extend.right, color = loCol, width = 1))
+        addLab(label.new(x = last_bar_time, y = lo, text = dTxt + " " + amlText + " [AM-" + str.tostring(lo, format.mintick) + "]", xloc = xloc.bar_time, yloc = yloc.price, color = loFill, style = label.style_label_left, textcolor = loTxt, size = 10, textalign = text.align_right))
+
+drawPM(int t1330, int t1500, float hi, float lo, int hiT, int loT, int dd, int mm, color v1330, color v1500, color t1330c, color t1500c, color hiCol, color loCol, color hiTxt, color loTxt, color hiFill, color loFill) =>
+    string dTxt = dateText(dd, mm)
+    if show1330
+        addLine(line.new(x1 = t1330, y1 = low, x2 = t1330, y2 = high, xloc = xloc.bar_time, extend = extend.both, color = v1330, width = 1, style = style1330))
+        addLab(label.new(x = t1330, y = na, text = text1330, xloc = xloc.bar_time, yloc = yloc.belowbar, color = color.new(color.white, 100), style = label.style_none, textcolor = t1330c, size = size.small))
+    if show1500
+        addLine(line.new(x1 = t1500, y1 = low, x2 = t1500, y2 = high, xloc = xloc.bar_time, extend = extend.both, color = v1500, width = 1, style = style1500))
+        addLab(label.new(x = t1500, y = na, text = text1500, xloc = xloc.bar_time, yloc = yloc.belowbar, color = color.new(color.white, 100), style = label.style_none, textcolor = t1500c, size = size.small))
+    if showPMH and not na(hi) and not na(hiT)
+        addLine(line.new(x1 = hiT, y1 = hi, x2 = last_bar_time, y2 = hi, xloc = xloc.bar_time, extend = extend.right, color = hiCol, width = 1))
+        addLab(label.new(x = last_bar_time, y = hi, text = dTxt + " " + pmhText + " [PM-" + str.tostring(hi, format.mintick) + "]", xloc = xloc.bar_time, yloc = yloc.price, color = hiFill, style = label.style_label_left, textcolor = hiTxt, size = 10, textalign = text.align_right))
+    if showPML and not na(lo) and not na(loT)
+        addLine(line.new(x1 = loT, y1 = lo, x2 = last_bar_time, y2 = lo, xloc = xloc.bar_time, extend = extend.right, color = loCol, width = 1))
+        addLab(label.new(x = last_bar_time, y = lo, text = dTxt + " " + pmlText + " [PM-" + str.tostring(lo, format.mintick) + "]", xloc = xloc.bar_time, yloc = yloc.price, color = loFill, style = label.style_label_left, textcolor = loTxt, size = 10, textalign = text.align_right))
+
+if barstate.islast
+    if array.size(drawnLines) > 0
+        for ln in drawnLines
+            line.delete(ln)
+        array.clear(drawnLines)
+    if array.size(drawnLabs) > 0
+        for lb in drawnLabs
+            label.delete(lb)
+        array.clear(drawnLabs)
+
+    if useAM
+        int amSize = array.size(amHistY)
+        int amStart = math.max(0, amSize - histDays)
+        if histDays > 0 and amSize > 0
+            for i = amStart to amSize - 1
+                drawAM(array.get(amHist0930, i), array.get(amHist1030, i), array.get(amHist1130, i), array.get(amHistHigh, i), array.get(amHistLow, i), array.get(amHistHighT, i), array.get(amHistLowT, i), array.get(amHistD, i), array.get(amHistMo, i), histColor, histColor, histColor, histColor, histColor, histColor, histColor, histColor, histColor, histColor, color.new(color.white, 100), color.new(color.white, 100))
+        if not na(amSess0930)
+            drawAM(amSess0930, amSess1030, amSess1130, amHigh, amLow, amHighT, amLowT, amSessD, amSessMo, lineCol0930, lineCol1030, lineCol1130, txtCol0930, txtCol1030, txtCol1130, amhColor, amlColor, amhTxtCol, amlTxtCol, amhFillCol, amlFillCol)
+
+    if usePM
+        int pmSize = array.size(pmHistY)
+        int pmStart = math.max(0, pmSize - histDays)
+        if histDays > 0 and pmSize > 0
+            for i = pmStart to pmSize - 1
+                drawPM(array.get(pmHist1330, i), array.get(pmHist1500, i), array.get(pmHistHigh, i), array.get(pmHistLow, i), array.get(pmHistHighT, i), array.get(pmHistLowT, i), array.get(pmHistD, i), array.get(pmHistMo, i), histColor, histColor, histColor, histColor, histColor, histColor, histColor, histColor, color.new(color.white, 100), color.new(color.white, 100))
+        if not na(pmSess1330)
+            drawPM(pmSess1330, pmSess1500, pmHigh, pmLow, pmHighT, pmLowT, pmSessD, pmSessMo, lineCol1330, lineCol1500, txtCol1330, txtCol1500, pmhColor, pmlColor, pmhTxtCol, pmlTxtCol, pmhFillCol, pmlFillCol)
