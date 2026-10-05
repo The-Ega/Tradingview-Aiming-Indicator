@@ -1,0 +1,338 @@
+//@version=6
+indicator("Session Marks Latest Day", overlay = true, max_lines_count = 500, max_labels_count = 500)
+
+string tz = input.string("America/New_York", "Timezone")
+int    lookbackDays = input.int(0, "Previous days to show", minval = 0, maxval = 5, group = "History")
+color  histColor    = input.color(color.black, "Previous days color", group = "History")
+
+bool   show0000    = input.bool(true, "Show", group = "00:00", inline = "00s")
+string style0000In = input.string("Dashed", "Style", options = ["Solid", "Dashed", "Dotted"], group = "00:00", inline = "00s")
+color  lineCol0000 = input.color(color.rgb(29, 126, 253), "Line", group = "00:00", inline = "00a")
+color  txtCol0000  = input.color(color.black, "Text color", group = "00:00", inline = "00b")
+color  fillCol0000 = input.color(color.rgb(255, 255, 255, 100), "Fill", group = "00:00", inline = "00b")
+
+bool   show0500    = input.bool(true, "Show", group = "05:00", inline = "05s")
+string style0500In = input.string("Dashed", "Style", options = ["Solid", "Dashed", "Dotted"], group = "05:00", inline = "05s")
+string text0500    = input.string("Overnight", "Text", group = "05:00", inline = "05a")
+color  lineCol0500 = input.color(color.rgb(29, 126, 253), "Line", group = "05:00", inline = "05a")
+color  txtCol0500  = input.color(color.black, "Text color", group = "05:00", inline = "05b")
+color  fillCol0500 = input.color(color.rgb(255, 255, 255, 100), "Fill", group = "05:00", inline = "05b")
+
+bool   show0700    = input.bool(true, "Show", group = "07:00", inline = "07s")
+string style0700In = input.string("Dashed", "Style", options = ["Solid", "Dashed", "Dotted"], group = "07:00", inline = "07s")
+string text0700    = input.string("Pre-Market", "Text", group = "07:00", inline = "07a")
+color  lineCol0700 = input.color(color.rgb(29, 126, 253), "Line", group = "07:00", inline = "07a")
+color  txtCol0700  = input.color(color.black, "Text color", group = "07:00", inline = "07b")
+color  fillCol0700 = input.color(color.rgb(255, 255, 255, 100), "Fill", group = "07:00", inline = "07b")
+
+bool   show0930    = input.bool(true, "Show", group = "09:30", inline = "09s")
+string style0930In = input.string("Dashed", "Style", options = ["Solid", "Dashed", "Dotted"], group = "09:30", inline = "09s")
+string text0930    = input.string("Equity Open", "Text", group = "09:30", inline = "09a")
+color  lineCol0930 = input.color(color.rgb(29, 126, 253), "Line", group = "09:30", inline = "09a")
+color  txtCol0930  = input.color(color.black, "Text color", group = "09:30", inline = "09b")
+color  fillCol0930 = input.color(color.rgb(21, 0, 0, 100), "Fill", group = "09:30", inline = "09b")
+
+bool   showOpenRay    = input.bool(true, "Show 00:00 open ray", group = "00:00 Open Ray")
+color  openRayColor   = input.color(#000000, "Ray color", group = "00:00 Open Ray")
+int    openRayWidth   = input.int(1, "Ray width", minval = 1, maxval = 4, group = "00:00 Open Ray")
+string openRayStyleIn = input.string("Solid", "Ray style", options = ["Solid", "Dashed", "Dotted"], group = "00:00 Open Ray")
+string openRayText    = input.string("00:00 True Day", "Ray text", group = "00:00 Open Ray")
+color  openRayTxtCol  = input.color(color.black, "Ray text color", group = "00:00 Open Ray")
+color  openRayFillCol = input.color(color.rgb(255, 255, 255, 100), "Ray text fill", group = "00:00 Open Ray")
+
+bool   showONH    = input.bool(true, "Show ray", group = "00:00-05:00 High")
+color  onhColor   = input.color(color.blue, "Ray color", group = "00:00-05:00 High")
+string onhText    = input.string("BUYSTOP [overnight]", "Ray text", group = "00:00-05:00 High")
+color  onhTxtCol  = input.color(color.black, "Text color", group = "00:00-05:00 High")
+color  onhFillCol = input.color(color.rgb(255, 255, 255, 100), "Text fill", group = "00:00-05:00 High")
+
+bool   showONL    = input.bool(true, "Show ray", group = "00:00-05:00 Low")
+color  onlColor   = input.color(color.red, "Ray color", group = "00:00-05:00 Low")
+string onlText    = input.string("SELLSTOP [Overnight]", "Ray text", group = "00:00-05:00 Low")
+color  onlTxtCol  = input.color(color.black, "Text color", group = "00:00-05:00 Low")
+color  onlFillCol = input.color(color.rgb(255, 255, 255, 100), "Text fill", group = "00:00-05:00 Low")
+
+bool   showPMH    = input.bool(true, "Show ray", group = "07:00-09:30 High")
+color  pmhColor   = input.color(color.blue, "Ray color", group = "07:00-09:30 High")
+string pmhText    = input.string("BUYSTOP [Pre-Market]", "Ray text", group = "07:00-09:30 High")
+color  pmhTxtCol  = input.color(color.black, "Text color", group = "07:00-09:30 High")
+color  pmhFillCol = input.color(color.rgb(255, 255, 255, 100), "Text fill", group = "07:00-09:30 High")
+
+bool   showPML    = input.bool(true, "Show ray", group = "07:00-09:30 Low")
+color  pmlColor   = input.color(color.red, "Ray color", group = "07:00-09:30 Low")
+string pmlText    = input.string("SELLSTOP [Pre-Market]", "Ray text", group = "07:00-09:30 Low")
+color  pmlTxtCol  = input.color(color.black, "Text color", group = "07:00-09:30 Low")
+color  pmlFillCol = input.color(color.rgb(255, 255, 255, 100), "Text fill", group = "07:00-09:30 Low")
+
+bool   showSettle     = input.bool(true, "Show ray", group = "16:14 RTH Settlement")
+color  settleColor    = input.color(color.yellow, "Latest settlement color", group = "16:14 RTH Settlement")
+int    settleWidth    = input.int(3, "Ray width", minval = 1, maxval = 5, group = "16:14 RTH Settlement")
+string settleStyleIn  = input.string("Solid", "Ray style", options = ["Solid", "Dashed", "Dotted"], group = "16:14 RTH Settlement")
+string settleText     = input.string("RTH Settlement", "Ray text", group = "16:14 RTH Settlement")
+color  settleTxtCol   = input.color(color.yellow, "Text color", group = "16:14 RTH Settlement")
+color  settleFillCol  = input.color(color.rgb(255, 255, 255, 100), "Text fill", group = "16:14 RTH Settlement")
+
+lineStyleFrom(string s) =>
+    s == "Dashed" ? line.style_dashed : s == "Dotted" ? line.style_dotted : line.style_solid
+
+// Weekday of the 00:00 timestamp in the selected timezone (Sun=1 ... Sat=7)
+dayName(int t) =>
+    int dow = dayofweek(t, tz)
+    dow == dayofweek.sunday ? "Sunday" : dow == dayofweek.monday ? "Monday" : dow == dayofweek.tuesday ? "Tuesday" : dow == dayofweek.wednesday ? "Wednesday" : dow == dayofweek.thursday ? "Thursday" : dow == dayofweek.friday ? "Friday" : "Saturday"
+
+string style0000    = lineStyleFrom(style0000In)
+string style0500    = lineStyleFrom(style0500In)
+string style0700    = lineStyleFrom(style0700In)
+string style0930    = lineStyleFrom(style0930In)
+string openRayStyle = lineStyleFrom(openRayStyleIn)
+string settleStyle  = lineStyleFrom(settleStyleIn)
+
+type DayData
+    int   t0000
+    int   t0500
+    int   t0700
+    int   t0930
+    int   t1614
+    float midOpen
+    int   midTime
+    float onH
+    int   onHT
+    float onL
+    int   onLT
+    float pmH
+    int   pmHT
+    float pmL
+    int   pmLT
+    float settle
+    int   settleT
+
+var array<DayData> history = array.new<DayData>()
+var array<line>    histLines  = array.new<line>()
+var array<label>   histLabels = array.new<label>()
+
+var line  line0000   = na
+var line  line0500   = na
+var line  line0700   = na
+var line  line0930   = na
+var line  openRay    = na
+var line  onhRay     = na
+var line  onlRay     = na
+var line  pmhRay     = na
+var line  pmlRay     = na
+var line  settleRay  = na
+var label tag0000    = na
+var label tag0500    = na
+var label tag0700    = na
+var label tag0930    = na
+var label openRayTag = na
+var label onhTag     = na
+var label onlTag     = na
+var label pmhTag     = na
+var label pmlTag     = na
+var label settleTag  = na
+
+var float midnightOpen = na
+var int   midnightTime = na
+var float onHigh  = na
+var float onLow   = na
+var int   onHighT = na
+var int   onLowT  = na
+var float pmHigh  = na
+var float pmLow   = na
+var int   pmHighT = na
+var int   pmLowT  = na
+var float settleClose = na
+var int   settleTime  = na
+var int   saved0000 = na
+var int   saved0500 = na
+var int   saved0700 = na
+var int   saved0930 = na
+var int   saved1614 = na
+
+int y  = year(time, tz)
+int mo = month(time, tz)
+int d  = dayofmonth(time, tz)
+int time0000 = timestamp(tz, y, mo, d, 0, 0)
+int time0500 = timestamp(tz, y, mo, d, 5, 0)
+int time0700 = timestamp(tz, y, mo, d, 7, 0)
+int time0930 = timestamp(tz, y, mo, d, 9, 30)
+int time1614 = timestamp(tz, y, mo, d, 16, 14)
+
+bool isMidnightBar = time <= time0000 and time_close > time0000
+bool isSettleBar   = time <= time1614 and time_close > time1614
+bool inOvernight   = time < time0500 and time_close > time0000
+bool inPremarket   = time < time0930 and time_close > time0700
+
+if isMidnightBar
+    if not na(midnightOpen)
+        DayData snap = DayData.new(
+             saved0000, saved0500, saved0700, saved0930, saved1614,
+             midnightOpen, midnightTime,
+             onHigh, onHighT, onLow, onLowT,
+             pmHigh, pmHighT, pmLow, pmLowT,
+             settleClose, settleTime)
+        array.unshift(history, snap)
+        if array.size(history) > 5
+            array.pop(history)
+    midnightOpen := open
+    midnightTime := time0000
+    onHigh := high
+    onLow  := low
+    onHighT := time
+    onLowT  := time
+    pmHigh := na
+    pmLow  := na
+    pmHighT := na
+    pmLowT  := na
+    settleClose := na
+    settleTime := na
+    saved0000 := time0000
+    saved0500 := time0500
+    saved0700 := time0700
+    saved0930 := time0930
+    saved1614 := time1614
+
+if isSettleBar
+    settleClose := close
+    settleTime  := time1614
+
+if not isMidnightBar
+    if inOvernight
+        if na(onHigh) or high >= onHigh
+            onHigh := high
+            onHighT := time
+        if na(onLow) or low <= onLow
+            onLow := low
+            onLowT := time
+    if inPremarket
+        if na(pmHigh) or high >= pmHigh
+            pmHigh := high
+            pmHighT := time
+        if na(pmLow) or low <= pmLow
+            pmLow := low
+            pmLowT := time
+
+deleteLine(line id) =>
+    if not na(id)
+        line.delete(id)
+
+deleteLabel(label id) =>
+    if not na(id)
+        label.delete(id)
+
+clearArrayLines(array<line> a) =>
+    if array.size(a) > 0
+        for ln in a
+            line.delete(ln)
+        array.clear(a)
+
+clearArrayLabels(array<label> a) =>
+    if array.size(a) > 0
+        for lb in a
+            label.delete(lb)
+        array.clear(a)
+
+drawVLine(bool show, int t, string sty, color lcol, string txt, color tcol, color fcol, bool storeHist) =>
+    line ln = na
+    label lb = na
+    if show and not na(t)
+        ln := line.new(x1 = t, y1 = low, x2 = t, y2 = high, xloc = xloc.bar_time, extend = extend.both, color = lcol, width = 1, style = sty)
+        lb := label.new(x = t, y = na, text = txt, xloc = xloc.bar_time, yloc = yloc.belowbar, color = fcol, style = label.style_label_up, textcolor = tcol, size = 10)
+        if storeHist
+            array.push(histLines, ln)
+            array.push(histLabels, lb)
+    [ln, lb]
+
+drawRay(bool show, int x1, float yv, string txt, color lcol, color tcol, color fcol, int w, string sty, bool storeHist) =>
+    line ln = na
+    label lb = na
+    if show and not na(x1) and not na(yv)
+        int x2 = last_bar_time + 60 * 1000
+        string datedTxt = str.format_time(x1, "d MMM", tz) + " " + txt
+        ln := line.new(x1 = x1, y1 = yv, x2 = x2, y2 = yv, xloc = xloc.bar_time, extend = extend.right, color = lcol, width = w, style = sty)
+        lb := label.new(x = x2, y = yv, text = datedTxt, xloc = xloc.bar_time, yloc = yloc.price, color = fcol, style = label.style_label_left, textcolor = tcol, size = 10, textalign = text.align_right)
+        if storeHist
+            array.push(histLines, ln)
+            array.push(histLabels, lb)
+    [ln, lb]
+
+if barstate.islast
+    deleteLine(line0000)
+    deleteLine(line0500)
+    deleteLine(line0700)
+    deleteLine(line0930)
+    deleteLine(openRay)
+    deleteLine(onhRay)
+    deleteLine(onlRay)
+    deleteLine(pmhRay)
+    deleteLine(pmlRay)
+    deleteLine(settleRay)
+    deleteLabel(tag0000)
+    deleteLabel(tag0500)
+    deleteLabel(tag0700)
+    deleteLabel(tag0930)
+    deleteLabel(openRayTag)
+    deleteLabel(onhTag)
+    deleteLabel(onlTag)
+    deleteLabel(pmhTag)
+    deleteLabel(pmlTag)
+    deleteLabel(settleTag)
+    clearArrayLines(histLines)
+    clearArrayLabels(histLabels)
+
+    [l0, g0] = drawVLine(show0000, time0000, style0000, lineCol0000, dayName(time0000), txtCol0000, fillCol0000, false)
+    [l5, g5] = drawVLine(show0500, time0500, style0500, lineCol0500, text0500, txtCol0500, fillCol0500, false)
+    [l7, g7] = drawVLine(show0700, time0700, style0700, lineCol0700, text0700, txtCol0700, fillCol0700, false)
+    [l9, g9] = drawVLine(show0930, time0930, style0930, lineCol0930, text0930, txtCol0930, fillCol0930, false)
+    line0000 := l0
+    line0500 := l5
+    line0700 := l7
+    line0930 := l9
+    tag0000 := g0
+    tag0500 := g5
+    tag0700 := g7
+    tag0930 := g9
+
+    [ro, tagO] = drawRay(showOpenRay, midnightTime, midnightOpen, openRayText, openRayColor, openRayTxtCol, openRayFillCol, openRayWidth, openRayStyle, false)
+    [rh, tagH] = drawRay(showONH, onHighT, onHigh, onhText, onhColor, onhTxtCol, onhFillCol, 1, line.style_solid, false)
+    [rl, tagL] = drawRay(showONL, onLowT, onLow, onlText, onlColor, onlTxtCol, onlFillCol, 1, line.style_solid, false)
+    [rph, tagPH] = drawRay(showPMH, pmHighT, pmHigh, pmhText, pmhColor, pmhTxtCol, pmhFillCol, 1, line.style_solid, false)
+    [rpl, tagPL] = drawRay(showPML, pmLowT, pmLow, pmlText, pmlColor, pmlTxtCol, pmlFillCol, 1, line.style_solid, false)
+
+    bool haveTodaySettle = not na(settleClose) and not na(settleTime)
+    [rs, tagS] = drawRay(showSettle, settleTime, settleClose, settleText, settleColor, settleTxtCol, settleFillCol, settleWidth, settleStyle, false)
+    openRay := ro
+    onhRay := rh
+    onlRay := rl
+    pmhRay := rph
+    pmlRay := rpl
+    settleRay := rs
+    openRayTag := tagO
+    onhTag := tagH
+    onlTag := tagL
+    pmhTag := tagPH
+    pmlTag := tagPL
+    settleTag := tagS
+
+    int nHist = math.min(lookbackDays, array.size(history))
+    if nHist > 0
+        color histFill = color.new(histColor, 100)
+        color settleFillLatest = color.new(settleColor, 100)
+        for i = 0 to nHist - 1
+            DayData hd = array.get(history, i)
+            drawVLine(show0000, hd.t0000, style0000, histColor, dayName(hd.t0000), histColor, histFill, true)
+            drawVLine(show0500, hd.t0500, style0500, histColor, text0500, histColor, histFill, true)
+            drawVLine(show0700, hd.t0700, style0700, histColor, text0700, histColor, histFill, true)
+            drawVLine(show0930, hd.t0930, style0930, histColor, text0930, histColor, histFill, true)
+            drawRay(showOpenRay, hd.midTime, hd.midOpen, openRayText, histColor, histColor, histFill, openRayWidth, openRayStyle, true)
+            drawRay(showONH, hd.onHT, hd.onH, onhText, histColor, histColor, histFill, 1, line.style_solid, true)
+            drawRay(showONL, hd.onLT, hd.onL, onlText, histColor, histColor, histFill, 1, line.style_solid, true)
+            drawRay(showPMH, hd.pmHT, hd.pmH, pmhText, histColor, histColor, histFill, 1, line.style_solid, true)
+            drawRay(showPML, hd.pmLT, hd.pmL, pmlText, histColor, histColor, histFill, 1, line.style_solid, true)
+
+            // If today has not settled yet, history[0] is the newest 16:14 print
+            bool isLatestSettle = not haveTodaySettle and i == 0
+            color sCol = isLatestSettle ? settleColor : histColor
+            color sTxt = isLatestSettle ? settleTxtCol : histColor
+            color sFill = isLatestSettle ? settleFillLatest : histFill
+            drawRay(showSettle, hd.settleT, hd.settle, settleText, sCol, sTxt, sFill, settleWidth, settleStyle, true)
